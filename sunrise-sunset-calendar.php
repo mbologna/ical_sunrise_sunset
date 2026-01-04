@@ -1,18 +1,22 @@
 <?php
 /**
- * Sunrise/Sunset iCal Calendar Generator
- * Generates iCalendar files with sunrise and sunset times for any location
+ * Sunrise/Sunset iCal Calendar Generator with Subscription Support
+ * Generates dynamic iCalendar feeds that update automatically
  *
- * @author Original: pdxvr | Optimized: 2026
- * @version 2.0
+ * @version 3.0 - Subscription support with authentication
  */
+
+// Configuration
+define('AUTH_TOKEN', 'your_secret_token_here_change_this'); // CHANGE THIS TO A RANDOM STRING
+define('CALENDAR_WINDOW_DAYS', 365); // How many days ahead to generate
+define('UPDATE_INTERVAL', 86400); // How often calendars should refresh (24 hours)
 
 // Security headers
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
 
-// Input validation and sanitization functions
+// Input validation functions
 function sanitize_float($value, $default, $min = -90, $max = 90) {
     $filtered = filter_var($value, FILTER_VALIDATE_FLOAT);
     if ($filtered === false || $filtered < $min || $filtered > $max) {
@@ -34,70 +38,59 @@ function sanitize_timezone($value) {
     return in_array($value, $zones, true) ? $value : 'America/Los_Angeles';
 }
 
-function sanitize_date($value, $default) {
-    $timestamp = strtotime($value);
-    return $timestamp !== false ? $timestamp : $default;
-}
-
 function sanitize_text($value, $max_length = 500) {
     $clean = strip_tags($value);
     $clean = str_replace(["\r\n", "\r", "\n"], " ", $clean);
     return substr($clean, 0, $max_length);
 }
 
-// Process form submission
-if (isset($_POST['submit']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+function verify_token($provided_token) {
+    return hash_equals(AUTH_TOKEN, $provided_token);
+}
 
-    // Validate CSRF token would go here in production
+// Handle calendar feed requests (subscription URL)
+if (isset($_GET['feed']) && isset($_GET['token'])) {
 
-    // Sanitize all inputs
-    $timezone = sanitize_timezone($_POST['zone'] ?? '');
+    // Verify authentication token
+    if (!verify_token($_GET['token'])) {
+        http_response_code(403);
+        die('Invalid authentication token');
+    }
+
+    // Get parameters from URL
+    $lat = sanitize_float($_GET['lat'] ?? '', 45.58753958079636, -90, 90);
+    $lon = sanitize_float($_GET['lon'] ?? '', -122.58886098861694, -180, 180);
+    $timezone = sanitize_timezone($_GET['zone'] ?? 'America/Los_Angeles');
+    $rise_offset = sanitize_int($_GET['rise_off'] ?? 0, 0) * 60;
+    $set_offset = sanitize_int($_GET['set_off'] ?? 0, 0) * 60;
+    $include_sunrise = isset($_GET['sunrise']) && $_GET['sunrise'] === '1';
+    $include_sunset = isset($_GET['sunset']) && $_GET['sunset'] === '1';
+    $twelve_hour = isset($_GET['twelve']) && $_GET['twelve'] === '1';
+    $description = sanitize_text($_GET['desc'] ?? '');
+
+    // Set timezone
     putenv("TZ={$timezone}");
     date_default_timezone_set($timezone);
 
-    $start = isset($_POST['start']) && $_POST['start'] !== ''
-        ? sanitize_date($_POST['start'], strtotime('today'))
-        : strtotime('today');
-
-    $end = isset($_POST['end']) && $_POST['end'] !== ''
-        ? sanitize_date($_POST['end'], $start + 31449600)
-        : $start + 31449600;
-
-    // Limit to 365 days maximum
-    if ($end - $start > 31536000) {
-        $end = $start + 31536000;
-    }
-
-    $rise_offset = sanitize_int($_POST['rise_off'] ?? 0, 0) * 60;
-    $set_offset = sanitize_int($_POST['set_off'] ?? 0, 0) * 60;
-    $lat = sanitize_float($_POST['lat'] ?? '', 45.58753958079636, -90, 90);
-    $lon = sanitize_float($_POST['lon'] ?? '', -122.58886098861694, -180, 180);
-    $twelve_hour = isset($_POST['twelve']);
-    $description = sanitize_text($_POST['description'] ?? '');
-    $include_sunrise = isset($_POST['sunrise']);
-    $include_sunset = isset($_POST['sunset']);
-
-    // Validate at least one event type selected
-    if (!$include_sunrise && !$include_sunset) {
-        die('Error: Please select at least one event type (sunrise or sunset)');
-    }
-
-    // Generate iCal file
+    // Generate calendar feed
     header('Content-Type: text/calendar; charset=utf-8');
-    header('Content-Disposition: attachment; filename="sunrise-sunset-calendar.ics"');
+    header('Cache-Control: max-age=' . UPDATE_INTERVAL);
 
     echo "BEGIN:VCALENDAR\r\n";
     echo "VERSION:2.0\r\n";
-    echo "PRODID:-//Sunrise Sunset Calendar Generator//EN\r\n";
+    echo "PRODID:-//Sunrise Sunset Calendar//EN\r\n";
     echo "CALSCALE:GREGORIAN\r\n";
     echo "METHOD:PUBLISH\r\n";
-    echo "X-WR-CALNAME:Sunrise/Sunset Calendar for {$lat}, {$lon}\r\n";
+    echo "X-WR-CALNAME:Sunrise/Sunset - {$lat}, {$lon}\r\n";
     echo "X-WR-TIMEZONE:{$timezone}\r\n";
+    echo "X-PUBLISHED-TTL:PT" . (UPDATE_INTERVAL / 3600) . "H\r\n";
+    echo "REFRESH-INTERVAL;VALUE=DURATION:PT" . (UPDATE_INTERVAL / 3600) . "H\r\n";
 
+    $start = strtotime('today');
+    $end = strtotime('+' . CALENDAR_WINDOW_DAYS . ' days');
     $current_day = $start;
-    $days_processed = 0;
 
-    while ($current_day <= $end && $days_processed < 365) {
+    while ($current_day <= $end) {
         $sun_info = date_sun_info($current_day, $lat, $lon);
 
         if ($include_sunrise && isset($sun_info['sunrise'])) {
@@ -107,13 +100,13 @@ if (isset($_POST['submit']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $display_time = date($twelve_hour ? 'g:i A' : 'H:i', $sun_info['sunrise']);
 
             echo "BEGIN:VEVENT\r\n";
-            echo "UID:{$date_str}T{$time_str}-sunrise-{$lat}-{$lon}@sunrise-calendar\r\n";
+            echo "UID:sunrise-{$date_str}-{$lat}-{$lon}@sunrise-calendar\r\n";
             echo "DTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
             echo "DTSTART:{$date_str}T{$time_str}Z\r\n";
             echo "DTEND:{$date_str}T{$time_str}Z\r\n";
             echo "SUMMARY:Sunrise: {$display_time}\r\n";
             if ($description) {
-                echo "DESCRIPTION:" . str_replace(["\r", "\n"], [" ", " "], $description) . "\r\n";
+                echo "DESCRIPTION:" . $description . "\r\n";
             }
             echo "TRANSP:TRANSPARENT\r\n";
             echo "END:VEVENT\r\n";
@@ -126,24 +119,61 @@ if (isset($_POST['submit']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $display_time = date($twelve_hour ? 'g:i A' : 'H:i', $sun_info['sunset']);
 
             echo "BEGIN:VEVENT\r\n";
-            echo "UID:{$date_str}T{$time_str}-sunset-{$lat}-{$lon}@sunrise-calendar\r\n";
+            echo "UID:sunset-{$date_str}-{$lat}-{$lon}@sunrise-calendar\r\n";
             echo "DTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
             echo "DTSTART:{$date_str}T{$time_str}Z\r\n";
             echo "DTEND:{$date_str}T{$time_str}Z\r\n";
             echo "SUMMARY:Sunset: {$display_time}\r\n";
             if ($description) {
-                echo "DESCRIPTION:" . str_replace(["\r", "\n"], [" ", " "], $description) . "\r\n";
+                echo "DESCRIPTION:" . $description . "\r\n";
             }
             echo "TRANSP:TRANSPARENT\r\n";
             echo "END:VEVENT\r\n";
         }
 
         $current_day = strtotime('+1 day', $current_day);
-        $days_processed++;
     }
 
     echo "END:VCALENDAR\r\n";
     exit;
+}
+
+// Handle form submission to generate subscription URL
+if (isset($_POST['generate_url']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    // Verify password
+    $password = $_POST['password'] ?? '';
+    if (!verify_token($password)) {
+        $error = 'Invalid password';
+    } else {
+        // Build subscription URL
+        $params = [
+            'feed' => '1',
+            'token' => AUTH_TOKEN,
+            'lat' => $_POST['lat'] ?? 45.58753958079636,
+            'lon' => $_POST['lon'] ?? -122.58886098861694,
+            'zone' => $_POST['zone'] ?? 'America/Los_Angeles',
+            'rise_off' => $_POST['rise_off'] ?? 0,
+            'set_off' => $_POST['set_off'] ?? 0,
+            'twelve' => isset($_POST['twelve']) ? '1' : '0',
+            'desc' => $_POST['description'] ?? '',
+        ];
+
+        if (isset($_POST['sunrise'])) {
+            $params['sunrise'] = '1';
+        }
+        if (isset($_POST['sunset'])) {
+            $params['sunset'] = '1';
+        }
+
+        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        $script = $_SERVER['SCRIPT_NAME'];
+        $subscription_url = $protocol . '://' . $host . $script . '?' . http_build_query($params);
+
+        // For webcal protocol (better for calendar apps)
+        $webcal_url = str_replace(['https://', 'http://'], 'webcal://', $subscription_url);
+    }
 }
 
 // Display form
@@ -160,8 +190,9 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Generate custom iCalendar files with sunrise and sunset times for any location worldwide">
-    <title>Sunrise & Sunset iCal Calendar Generator</title>
+    <meta name="description" content="Generate subscribable sunrise/sunset calendar feeds">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Sunrise & Sunset Calendar Subscription Generator</title>
     <style>
         * {
             box-sizing: border-box;
@@ -198,6 +229,23 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
             border-radius: 4px;
         }
 
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .error-box {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #721c24;
+        }
+
         .warning-box {
             background: #fff3cd;
             border-left: 4px solid #ffc107;
@@ -223,6 +271,7 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
 
         input[type="text"],
         input[type="number"],
+        input[type="password"],
         select,
         textarea {
             width: 100%;
@@ -235,6 +284,7 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
 
         input[type="text"]:focus,
         input[type="number"]:focus,
+        input[type="password"]:focus,
         select:focus,
         textarea:focus {
             outline: none;
@@ -314,12 +364,23 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
             margin: 25px 0;
         }
 
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            font-size: 0.9em;
-            color: #666;
+        .url-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .copy-button {
+            margin-top: 10px;
+            background: #6c757d;
+        }
+
+        .copy-button:hover {
+            background: #5a6268;
         }
 
         #location-status {
@@ -360,7 +421,7 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
 </head>
 <body>
     <div class="container">
-        <h1>🌅 Sunrise & Sunset Calendar Generator</h1>
+        <h1>🌅 Sunrise & Sunset Calendar Subscription</h1>
 
         <div class="info-box">
             <strong>Today's Information (Portland, Oregon)</strong><br>
@@ -369,14 +430,57 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
             Sunset: <?php echo date('g:i A', $sun_info['sunset']); ?>
         </div>
 
+        <?php if (isset($error)): ?>
+        <div class="error-box">
+            <strong>Error:</strong> <?php echo htmlspecialchars($error); ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if (isset($subscription_url)): ?>
+        <div class="success-box">
+            <h3>✅ Subscription URL Generated!</h3>
+
+            <p><strong>Your Calendar Subscription URL:</strong></p>
+            <div class="url-display" id="subscription-url"><?php echo htmlspecialchars($subscription_url); ?></div>
+            <button class="copy-button" onclick="copyToClipboard('subscription-url')">📋 Copy URL</button>
+
+            <p style="margin-top: 20px;"><strong>Webcal URL (recommended for most apps):</strong></p>
+            <div class="url-display" id="webcal-url"><?php echo htmlspecialchars($webcal_url); ?></div>
+            <button class="copy-button" onclick="copyToClipboard('webcal-url')">📋 Copy Webcal URL</button>
+
+            <hr>
+
+            <h4>How to Add to Google Calendar:</h4>
+            <ol>
+                <li>Copy the subscription URL above (either one works)</li>
+                <li>Open <a href="https://calendar.google.com" target="_blank">Google Calendar</a></li>
+                <li>Click the <strong>+</strong> next to "Other calendars"</li>
+                <li>Select <strong>"From URL"</strong></li>
+                <li>Paste your subscription URL</li>
+                <li>Click <strong>"Add calendar"</strong></li>
+            </ol>
+
+            <p><strong>Note:</strong> Your calendar will automatically update with new sunrise/sunset times daily. Keep this URL private!</p>
+        </div>
+        <?php endif; ?>
+
         <div class="warning-box">
-            <strong>⚠️ Important:</strong> Before importing the generated .ics file into your calendar app, please review it first. Removing hundreds of individual events is tedious if something goes wrong. This tool generates downloadable files only (not subscribable calendars).
+            <strong>🔒 Authentication Required</strong><br>
+            This page requires a password to generate calendar feeds. The generated URLs contain an authentication token that allows calendar apps to access your feed.
         </div>
 
         <button onclick="getLocation()" class="secondary">📍 Use My Current Location</button>
         <div id="location-status"></div>
 
         <form method="post" onsubmit="return validateForm()">
+            <hr>
+
+            <div class="form-group">
+                <label for="password">Password <span class="required">*</span></label>
+                <input type="password" name="password" id="password" required>
+                <div class="help-text">Enter the password to generate your calendar feed</div>
+            </div>
+
             <hr>
 
             <div class="form-group">
@@ -407,20 +511,6 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
                     }
                     ?>
                 </select>
-            </div>
-
-            <hr>
-
-            <div class="form-group">
-                <label for="start">Start Date</label>
-                <input type="text" name="start" id="start" placeholder="MM/DD/YYYY or 'today'">
-                <div class="help-text">Leave blank to start today</div>
-            </div>
-
-            <div class="form-group">
-                <label for="end">End Date</label>
-                <input type="text" name="end" id="end" placeholder="MM/DD/YYYY or '+1 year'">
-                <div class="help-text">Leave blank for one year from start (365 days maximum)</div>
             </div>
 
             <hr>
@@ -466,16 +556,24 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
                           placeholder="Add a custom description to all events"></textarea>
             </div>
 
-            <input type="submit" name="submit" value="Generate Calendar File">
+            <input type="submit" name="generate_url" value="Generate Subscription URL">
         </form>
 
-        <div class="footer">
-            <strong>Notes:</strong>
+        <div class="footer" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #666;">
+            <strong>Important Notes:</strong>
             <ul>
-                <li>Daylight Saving Time is automatically handled based on your selected timezone</li>
-                <li>Your location data is only used to calculate sunrise/sunset times and is not stored</li>
-                <li>Generated files work with Apple Calendar, Google Calendar, Outlook, and most calendar apps</li>
-                <li>Maximum 365 days of events per file</li>
+                <li>The calendar automatically generates <?php echo CALENDAR_WINDOW_DAYS; ?> days of events from today</li>
+                <li>Calendar apps will refresh the feed every <?php echo (UPDATE_INTERVAL / 3600); ?> hours</li>
+                <li>Keep your subscription URL private - it contains your authentication token</li>
+                <li>Daylight Saving Time is automatically handled</li>
+                <li>Your location data is only used in the URL parameters, not stored on the server</li>
+            </ul>
+
+            <strong>Security:</strong>
+            <ul>
+                <li>Change the AUTH_TOKEN in the PHP file to a random string</li>
+                <li>Never share your password or subscription URLs publicly</li>
+                <li>The feed URL is public but requires your secret token to access</li>
             </ul>
         </div>
     </div>
@@ -533,7 +631,32 @@ $sun_info = date_sun_info(time(), $default_lat, $default_lon);
                 return false;
             }
 
+            const password = document.getElementById('password').value;
+            if (!password) {
+                alert('Please enter the password.');
+                return false;
+            }
+
             return true;
+        }
+
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+
+            navigator.clipboard.writeText(text).then(function() {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = '✓ Copied!';
+                button.style.background = '#28a745';
+
+                setTimeout(function() {
+                    button.textContent = originalText;
+                    button.style.background = '';
+                }, 2000);
+            }, function(err) {
+                alert('Failed to copy: ' + err);
+            });
         }
     </script>
 </body>
