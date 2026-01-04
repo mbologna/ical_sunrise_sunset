@@ -2,15 +2,18 @@
 
 A PHP-based tool that generates dynamic iCalendar feeds with sunrise and sunset times for any location worldwide. Perfect for photographers, outdoor enthusiasts, or anyone who wants automated sunrise/sunset notifications in their calendar app.
 
+**New in v4.1:** Twilight period events, externalized configuration, Rome defaults
+
 ## Features
 
-- 🌅 **Dynamic Calendar Feeds**: Subscribe once, updates automatically forever
-- 🔒 **Secure Access**: Password-protected with token-based authentication
+- 🌅 **Twilight Period Events**: Calendar blocks from first light → sunrise and sunset → last light
+- 🔒 **Secure Access**: Password-protected with externalized token configuration
 - 🌍 **Any Location**: Works worldwide with latitude/longitude coordinates
 - ⏰ **Custom Offsets**: Set reminders before/after actual sunrise/sunset times
 - 📱 **Universal Compatibility**: Works with Google Calendar, Apple Calendar, Outlook, and any calendar app supporting iCal subscriptions
 - 🕐 **12/24 Hour Format**: Choose your preferred time display
 - 🔄 **Auto-Updates**: Calendar refreshes daily with new events
+- 🔐 **Git-Safe**: Configuration stored separately for secure version control
 
 ## Requirements
 
@@ -20,42 +23,52 @@ A PHP-based tool that generates dynamic iCalendar feeds with sunrise and sunset 
 
 ## Installation
 
-### 1. Generate Your Secret Token
-
-First, generate a secure random token:
+### 1. Clone or Download
 
 ```bash
-# Linux/Mac
+git clone https://github.com/yourusername/sunrise-sunset-calendar.git
+cd sunrise-sunset-calendar
+```
+
+### 2. Create Configuration File
+
+```bash
+# Copy the example config
+cp config.example.php config.php
+
+# Generate a secure random token
 openssl rand -hex 32
 
-# Or use an online generator
-# Example output: a8f5f167f44f4964e6c998dee827110c8f9c9eb76f9c8b5a3e6d4c2a1b0f9e8d
+# Edit config.php and replace CHANGE_ME_TO_A_RANDOM_STRING with your token
+nano config.php
 ```
 
-### 2. Configure the Script
-
-Edit `sunrise-sunset-calendar.php` and change the AUTH_TOKEN on line 12:
+Your `config.php` should look like this:
 
 ```php
-define('AUTH_TOKEN', 'a8f5f167f44f4964e6c998dee827110c'); // Your random token here
+<?php
+define('AUTH_TOKEN', 'a8f5f167f44f4964e6c998dee827110c8f9c9eb76f9c8b5a3e6d4c2a1b0f9e8d');
+define('CALENDAR_WINDOW_DAYS', 365);
+define('UPDATE_INTERVAL', 86400);
 ```
 
-**Important:** Keep this token secret! It's both your password and the authentication key for calendar apps.
+**Important:** Never commit `config.php` to git! It's already in `.gitignore`.
 
 ### 3. Deploy to Server
 
 #### For Nginx + PHP-FPM:
 
 ```bash
-# Upload the file
-scp sunrise-sunset-calendar.php user@yourserver:/var/www/html/
+# Upload files
+scp -r * user@yourserver:/var/www/html/sunrise-calendar/
 
 # Set correct permissions
-sudo chown www-data:www-data /var/www/html/sunrise-sunset-calendar.php
-sudo chmod 644 /var/www/html/sunrise-sunset-calendar.php
+sudo chown -R www-data:www-data /var/www/html/sunrise-calendar/
+sudo chmod 644 /var/www/html/sunrise-calendar/*.php
+sudo chmod 600 /var/www/html/sunrise-calendar/config.php  # Extra protection for config
 
 # Test PHP syntax
-php -l /var/www/html/sunrise-sunset-calendar.php
+php -l /var/www/html/sunrise-calendar/sunrise-sunset-calendar.php
 
 # Restart PHP-FPM if needed
 sudo systemctl restart php-fpm
@@ -64,15 +77,18 @@ sudo systemctl restart php-fpm
 #### For Apache:
 
 ```bash
-# Upload to your web root
-scp sunrise-sunset-calendar.php user@yourserver:/var/www/html/
+# Upload files
+scp -r * user@yourserver:/var/www/html/sunrise-calendar/
 
 # Set permissions
-sudo chown www-data:www-data /var/www/html/sunrise-sunset-calendar.php
-sudo chmod 644 /var/www/html/sunrise-sunset-calendar.php
+sudo chown -R www-data:www-data /var/www/html/sunrise-calendar/
+sudo chmod 644 /var/www/html/sunrise-calendar/*.php
+sudo chmod 600 /var/www/html/sunrise-calendar/config.php
 ```
 
-### 4. Configure Nginx (if applicable)
+### 4. Configure Web Server
+
+#### Nginx Configuration:
 
 Ensure your Nginx config includes PHP processing:
 
@@ -358,6 +374,23 @@ The script generates standards-compliant iCalendar feeds:
 - Minimal server resources
 - Stateless - no data persistence needed
 
+## Contributing
+
+This is a standalone script. To customize:
+
+1. Edit the PHP file directly
+2. Modify CSS styles in the `<style>` section
+3. Adjust calculation parameters in the configuration section
+4. Test thoroughly before deploying changes
+
 ## License
 
 Free to use and modify. Original concept by pdxvr, optimized and enhanced 2026.
+
+## Support
+
+For issues:
+1. Check the Troubleshooting section above
+2. Verify your PHP error logs
+3. Test with default coordinates first
+4. Ensure your AUTH_TOKEN is properly configured
