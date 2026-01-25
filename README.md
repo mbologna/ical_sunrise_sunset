@@ -1,396 +1,195 @@
-# Sunrise & Sunset Calendar Subscription Generator
+# Enhanced Sun & Twilight Calendar Generator
 
-A PHP-based tool that generates dynamic iCalendar feeds with sunrise and sunset times for any location worldwide. Perfect for photographers, outdoor enthusiasts, or anyone who wants automated sunrise/sunset notifications in their calendar app.
+A PHP-based tool that generates dynamic iCalendar feeds with comprehensive sun position data for any location worldwide. Perfect for photographers, astronomers, outdoor enthusiasts, or anyone who wants automated sunrise/sunset/twilight notifications in their calendar app.
 
-**New in v4.1:** Twilight period events, externalized configuration, Rome defaults
+**Current Version: 5.1** - Dawn/Dusk naming, enhanced statistics, smart single-event mode
 
 ## Features
 
-- 🌅 **Twilight Period Events**: Calendar blocks from first light → sunrise and sunset → last light
-- 🔒 **Secure Access**: Password-protected with externalized token configuration
+- 🌅 **Multiple Event Types**: Civil, Nautical, and Astronomical twilight periods plus full day/night cycles
+- 📊 **Detailed Statistics**: Daylight duration, percentages, and yearly percentiles
+- 🧠 **Smart Single-Event Mode**: Select just one event type to get a clean calendar with all sun data in event notes
 - 🌍 **Any Location**: Works worldwide with latitude/longitude coordinates
-- ⏰ **Custom Offsets**: Set reminders before/after actual sunrise/sunset times
-- 📱 **Universal Compatibility**: Works with Google Calendar, Apple Calendar, Outlook, and any calendar app supporting iCal subscriptions
+- ⏰ **Custom Offsets**: Set reminders before/after actual sun events
 - 🕐 **12/24 Hour Format**: Choose your preferred time display
 - 🔄 **Auto-Updates**: Calendar refreshes daily with new events
-- 🔐 **Git-Safe**: Configuration stored separately for secure version control
+- 🔒 **Secure**: Password-protected with externalized configuration
+- 📱 **Universal**: Works with Google Calendar, Apple Calendar, Outlook, and any iCal-compatible app
 
-## Requirements
+## What You Get
 
-- PHP 7.4 or higher
-- Web server (Nginx, Apache, etc.) with PHP support
-- HTTPS recommended (required for some calendar apps)
+### Event Types (Select Any Combination):
 
-## Installation
+1. **🌌 Astronomical Dawn/Dusk** - When stars appear/disappear (Sun 12-18° below horizon)
+2. **⚓ Nautical Dawn/Dusk** - When horizon becomes visible/invisible at sea (Sun 6-12° below horizon)
+3. **🌅 Civil Dawn/Dusk** - First light to sunrise, sunset to last light (Sun 0-6° below horizon)
+4. **☀️ Day & Night** - Complete daylight period + full night with statistics
 
-### 1. Clone or Download
+### Each Event Includes:
+
+- **Contextual descriptions** explaining what happens during that specific period
+- **Solar events** (solar noon for day, solar midnight for night)
+- **Statistics** (duration, percentage of day, yearly percentile ranking)
+- **Complete sun schedule** (when selecting only one event type)
+
+## Quick Start
+
+### 1. Installation
 
 ```bash
-git clone https://github.com/yourusername/sunrise-sunset-calendar.git
-cd sunrise-sunset-calendar
-```
+# Clone repository
+git clone https://github.com/yourusername/sun-twilight-calendar.git
+cd sun-twilight-calendar
 
-### 2. Create Configuration File
-
-```bash
-# Copy the example config
+# Create config from example
 cp config.example.php config.php
 
-# Generate a secure random token
+# Generate secure token (Linux/Mac)
 openssl rand -hex 32
 
-# Edit config.php and replace CHANGE_ME_TO_A_RANDOM_STRING with your token
+# Edit config.php and set your AUTH_TOKEN
 nano config.php
 ```
 
-Your `config.php` should look like this:
-
+Your `config.php`:
 ```php
 <?php
-define('AUTH_TOKEN', 'a8f5f167f44f4964e6c998dee827110c8f9c9eb76f9c8b5a3e6d4c2a1b0f9e8d');
-define('CALENDAR_WINDOW_DAYS', 365);
-define('UPDATE_INTERVAL', 86400);
+define('AUTH_TOKEN', 'your_secure_random_token_here');
+define('CALENDAR_WINDOW_DAYS', 365);  // Days to generate
+define('UPDATE_INTERVAL', 86400);      // Refresh every 24 hours
 ```
 
-**Important:** Never commit `config.php` to git! It's already in `.gitignore`.
+### 2. Deploy
 
-### 3. Deploy to Server
-
-#### For Nginx + PHP-FPM:
+Upload to your web server with PHP support (7.4+). Ensure `config.php` is not web-accessible or in `.gitignore`.
 
 ```bash
-# Upload files
-scp -r * user@yourserver:/var/www/html/sunrise-calendar/
-
-# Set correct permissions
-sudo chown -R www-data:www-data /var/www/html/sunrise-calendar/
-sudo chmod 644 /var/www/html/sunrise-calendar/*.php
-sudo chmod 600 /var/www/html/sunrise-calendar/config.php  # Extra protection for config
-
-# Test PHP syntax
-php -l /var/www/html/sunrise-calendar/sunrise-sunset-calendar.php
-
-# Restart PHP-FPM if needed
-sudo systemctl restart php-fpm
-```
-
-#### For Apache:
-
-```bash
-# Upload files
-scp -r * user@yourserver:/var/www/html/sunrise-calendar/
-
 # Set permissions
-sudo chown -R www-data:www-data /var/www/html/sunrise-calendar/
-sudo chmod 644 /var/www/html/sunrise-calendar/*.php
-sudo chmod 600 /var/www/html/sunrise-calendar/config.php
+chmod 644 *.php
+chmod 600 config.php
 ```
 
-### 4. Configure Web Server
+### 3. Generate Calendar
 
-#### Nginx Configuration:
+1. Navigate to `https://yourdomain.com/sunrise-sunset-calendar.php`
+2. Enter your password (same as AUTH_TOKEN)
+3. Set your location (or click "Use My Current Location")
+4. Select event types - **Pro tip:** Select only ONE for a clean calendar with complete info
+5. Click "Generate Subscription URL"
 
-Ensure your Nginx config includes PHP processing:
+### 4. Subscribe in Your Calendar App
 
-```nginx
-location ~ \.php$ {
-    fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;  # Adjust PHP version
-    fastcgi_index index.php;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    include fastcgi_params;
-}
-```
-
-Reload Nginx:
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## Usage
-
-### Step 1: Access the Web Interface
-
-Navigate to your script in a web browser:
-```
-https://yourdomain.com/sunrise-sunset-calendar.php
-```
-
-### Step 2: Configure Your Calendar
-
-1. **Enter Password**: Use your AUTH_TOKEN as the password
-2. **Set Location**:
-   - Click "Use My Current Location" for automatic detection
-   - Or manually enter latitude/longitude coordinates
-   - Select your timezone from the dropdown
-3. **Configure Options**:
-   - Set sunrise/sunset offsets (e.g., -15 for 15 minutes before)
-   - Choose 12-hour or 24-hour time format
-   - Select which events to include (sunrise, sunset, or both)
-   - Add optional description text
-4. **Click "Generate Subscription URL"**
-
-### Step 3: Add to Your Calendar App
-
-The page will display two URLs:
-- **HTTP/HTTPS URL**: Standard subscription URL
-- **Webcal URL**: Preferred for most calendar apps
-
-#### Google Calendar:
-
-1. Copy the subscription URL (either format works)
-2. Open [Google Calendar](https://calendar.google.com)
-3. Click the **+** button next to "Other calendars" (left sidebar)
-4. Select **"From URL"**
-5. Paste your subscription URL
-6. Click **"Add calendar"**
-
-The calendar will appear in your sidebar and automatically update daily.
-
-#### Apple Calendar (macOS/iOS):
-
-1. Copy the **webcal://** URL
-2. **macOS**: File → New Calendar Subscription → Paste URL
-3. **iOS**: Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar → Paste URL
-
-#### Outlook:
-
+**Google Calendar:**
 1. Copy the subscription URL
-2. Go to Calendar view
-3. Select "Add calendar" → "Subscribe from web"
-4. Paste URL and configure name/color
-5. Click "Import"
+2. Google Calendar → "+" next to Other calendars → From URL
+3. Paste URL → Add calendar
+
+**Apple Calendar:**
+1. Copy the webcal:// URL
+2. File → New Calendar Subscription → Paste URL
+
+**Outlook:**
+1. Copy URL
+2. Add calendar → Subscribe from web → Paste URL
 
 ## Configuration Options
 
-### Available Parameters
-
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `lat` | Latitude (decimal degrees) | 45.58753 (Portland, OR) |
-| `lon` | Longitude (decimal degrees) | -122.58886 (Portland, OR) |
-| `zone` | Timezone (e.g., America/Los_Angeles) | America/Los_Angeles |
-| `rise_off` | Sunrise offset in minutes (+/- 1440) | 0 |
-| `set_off` | Sunset offset in minutes (+/- 1440) | 0 |
-| `twelve` | Use 12-hour format (1=yes, 0=no) | 0 |
-| `sunrise` | Include sunrise events (1=yes) | Required |
-| `sunset` | Include sunset events (1=yes) | Required |
-| `desc` | Custom event description | Empty |
+| `lat` | Latitude (-90 to 90) | 41.9028 (Rome) |
+| `lon` | Longitude (-180 to 180) | 12.4964 (Rome) |
+| `elev` | Elevation in meters | 21 |
+| `zone` | Timezone | Europe/Rome |
+| `rise_off` | Morning event offset (minutes) | 0 |
+| `set_off` | Evening event offset (minutes) | 0 |
+| `twelve` | Use 12-hour format | 0 (24-hour) |
+| `civil` | Include civil twilight | 0 |
+| `nautical` | Include nautical twilight | 0 |
+| `astro` | Include astronomical twilight | 0 |
+| `sun` | Include day/night events | 0 |
+| `desc` | Custom description | Empty |
 
-### Advanced Configuration
+## Smart Single-Event Mode
 
-Edit the constants at the top of the PHP file:
+**The Secret Sauce:** When you select only ONE event type, all other sun times and statistics are automatically included in each event's description!
 
-```php
-define('AUTH_TOKEN', 'your_secret_token');      // Authentication token
-define('CALENDAR_WINDOW_DAYS', 365);            // Days to generate ahead
-define('UPDATE_INTERVAL', 86400);               // Refresh interval (seconds)
+**Example:** Select only "Civil Dawn/Dusk" → You get:
+- Clean calendar with just 2 events per day (dawn and dusk)
+- Each event contains: astronomical dawn, nautical dawn, sunrise, solar noon, sunset, nautical dusk, astronomical dusk
+- Plus complete daylight/night statistics
+- All with emojis and descriptions for easy reading
+
+Perfect for minimalist calendars with maximum information!
+
+## Understanding the Events
+
+### Dawn → Dusk Progression:
+```
+🌌 Astronomical Dawn  → Stars fade, first light appears
+⚓ Nautical Dawn       → Horizon becomes visible
+🌅 Civil Dawn          → Enough light for activities (First Light)
+☀️ Sunrise            → Sun breaks horizon
+☀️ Solar Noon         → Sun at highest point
+☀️ Sunset             → Sun dips below horizon
+🌇 Civil Dusk          → Artificial light needed (Last Light)
+⚓ Nautical Dusk       → Horizon fades from view
+🌌 Astronomical Dusk   → Complete darkness
+🌙 Night              → Optimal stargazing
 ```
 
-- **CALENDAR_WINDOW_DAYS**: How many days of events to generate (default: 365)
-- **UPDATE_INTERVAL**: How often calendar apps should check for updates (default: 24 hours)
+## Security
 
-## Security Considerations
-
-### Important Security Notes:
-
-1. **Keep Your Token Secret**: Never share your AUTH_TOKEN or generated subscription URLs publicly
-2. **Use HTTPS**: Some calendar apps require HTTPS for subscriptions
-3. **Unique Tokens**: Use a different token for each installation
-4. **Access Control**: Consider adding IP restrictions in your web server config
-5. **No Data Storage**: The script doesn't store any data - everything is calculated on-demand
-
-### Optional: Restrict Access by IP
-
-Add to your Nginx config:
-
-```nginx
-location /sunrise-sunset-calendar.php {
-    # Allow only your IP address
-    allow 1.2.3.4;          # Your home IP
-    allow 5.6.7.8;          # Your work IP
-    deny all;
-
-    # ... rest of PHP configuration
-}
-```
-
-### Optional: Add HTTP Basic Auth
-
-Create `.htpasswd` file:
-```bash
-sudo htpasswd -c /etc/nginx/.htpasswd yourusername
-```
-
-Add to Nginx config:
-```nginx
-location /sunrise-sunset-calendar.php {
-    auth_basic "Restricted Access";
-    auth_basic_user_file /etc/nginx/.htpasswd;
-
-    # ... rest of PHP configuration
-}
-```
+- **Keep AUTH_TOKEN secret** - Never commit `config.php` to version control
+- **Use HTTPS** - Required by most calendar apps
+- **Unique tokens** - Generate a different token for each installation
+- **No data storage** - Everything calculated on-demand, nothing logged
 
 ## Troubleshooting
 
-### Calendar Not Updating
+**Calendar not updating?**
+- Wait 24 hours for refresh or remove/re-add subscription
+- Check URL is still accessible in browser
 
-**Problem**: Events don't appear or stop updating
+**Wrong times?**
+- Verify coordinates and timezone are correct
+- Times calculated using PHP's astronomical algorithms (may differ slightly from other sources)
 
-**Solutions**:
-1. Check that the subscription URL is still accessible (visit it in a browser)
-2. Remove and re-add the calendar subscription
-3. Some calendar apps cache aggressively - wait 24 hours or force refresh
-4. Verify your web server logs for errors: `tail -f /var/log/nginx/error.log`
+**Events not appearing?**
+- Ensure at least one event type is selected
+- Check calendar is visible/enabled in your app
+- Wait 5-10 minutes for initial sync
 
-### "Invalid Authentication Token" Error
-
-**Problem**: Getting 403 error when accessing feed
-
-**Solutions**:
-1. Verify your AUTH_TOKEN in the PHP file matches the URL
-2. Check for extra spaces or characters in the token
-3. Regenerate the subscription URL with the correct password
-
-### Times Are Wrong
-
-**Problem**: Sunrise/sunset times don't match reality
-
-**Solutions**:
-1. Verify your latitude/longitude are correct
-2. Check that the correct timezone is selected
-3. Ensure your server's PHP timezone database is up to date: `sudo apt update && sudo apt upgrade`
-4. Test with a known location (e.g., Portland coordinates provided as default)
-
-### Events Not Appearing in Calendar
-
-**Problem**: Subscription added but no events visible
-
-**Solutions**:
-1. Wait 5-10 minutes for initial sync
-2. Check that at least one event type (sunrise or sunset) is selected
-3. Verify the calendar is visible/enabled in your calendar app
-4. Check the date range - events only appear from today forward
-
-### PHP Errors
-
-**Problem**: White screen or PHP errors
-
-**Solutions**:
+**PHP errors?**
 ```bash
-# Check PHP error log
-sudo tail -f /var/log/php-fpm/error.log  # or /var/log/php/error.log
-
-# Test PHP syntax
-php -l sunrise-sunset-calendar.php
-
-# Check PHP version (requires 7.4+)
-php -v
-
-# Verify PHP-FPM is running
-sudo systemctl status php-fpm
+php -l sunrise-sunset-calendar.php  # Check syntax
+tail -f /var/log/nginx/error.log    # Check server logs
 ```
 
 ## Finding Your Coordinates
 
-### Using the Web Interface
-- Click "Use My Current Location" button (requires browser location permission)
-
-### Using Online Tools
-- [Google Maps](https://maps.google.com): Right-click any location → coordinates appear
-- [LatLong.net](https://www.latlong.net): Search for any address
-
-### Format Requirements
-- **Latitude**: -90 to 90 (negative = South)
-- **Longitude**: -180 to 180 (negative = West)
-- **Decimal degrees**: e.g., 45.587539, -122.588861 (not degrees/minutes/seconds)
-
-## Example Use Cases
-
-### Photographer's Golden Hour Reminder
-- Sunrise offset: `-30` (30 minutes before sunrise)
-- Sunset offset: `-30` (30 minutes before sunset)
-- Both sunrise and sunset enabled
-
-### Morning Exercise Routine
-- Only sunrise enabled
-- Offset: `0` (at actual sunrise time)
-
-### Evening Dog Walk
-- Only sunset enabled
-- Offset: `-15` (15 minutes before sunset)
-
-### Complete Day Planning
-- Both events enabled
-- Offsets: `0` for both
-- 12-hour format enabled
-
-## API/Feed URL Structure
-
-The generated subscription URL follows this format:
-
-```
-https://yourdomain.com/sunrise-sunset-calendar.php?
-  feed=1
-  &token=YOUR_SECRET_TOKEN
-  &lat=45.587539
-  &lon=-122.588861
-  &zone=America/Los_Angeles
-  &rise_off=0
-  &set_off=0
-  &sunrise=1
-  &sunset=1
-  &twelve=0
-  &desc=Custom%20description
-```
-
-You can manually construct URLs if needed, but it's easier to use the web interface.
+- **Web interface**: Click "Use My Current Location"
+- **Google Maps**: Right-click anywhere → coordinates appear
+- **Format**: Decimal degrees (e.g., 41.9028, 12.4964)
 
 ## Technical Details
 
-### How It Works
+- **Language**: PHP 7.4+
+- **Format**: iCalendar (RFC 5545)
+- **Calculations**: PHP `date_sun_info()` function
+- **Performance**: <100ms for 365 days
+- **Storage**: Stateless, no database required
 
-1. Calendar app requests the subscription URL
-2. Script validates the authentication token
-3. Calculates sunrise/sunset for next 365 days using PHP's `date_sun_info()`
-4. Generates iCalendar format (RFC 5545) on-the-fly
-5. Returns calendar feed with refresh headers
-6. Calendar app automatically re-fetches daily
+## Example Use Cases
 
-### iCalendar Format
-
-The script generates standards-compliant iCalendar feeds:
-- Version: 2.0
-- Format: RFC 5545
-- Encoding: UTF-8
-- Timezone: Configurable per calendar
-- UID: Unique per event (location + date + type)
-
-### Performance
-
-- Near-instant generation (< 100ms for 365 days)
-- No database required
-- Minimal server resources
-- Stateless - no data persistence needed
-
-## Contributing
-
-This is a standalone script. To customize:
-
-1. Edit the PHP file directly
-2. Modify CSS styles in the `<style>` section
-3. Adjust calculation parameters in the configuration section
-4. Test thoroughly before deploying changes
+- **Photographer**: Civil twilight only for golden/blue hour planning
+- **Astronomer**: Astronomical twilight + night for optimal observation windows
+- **Outdoor enthusiast**: All twilights for complete day planning
+- **Minimalist**: Any single event type for clean calendar with full data in notes
 
 ## License
 
-Free to use and modify. Original concept by pdxvr, optimized and enhanced 2026.
+Free to use and modify. Originally by [pdxvr](https://github.com/pdxvr/ical_sunrise_sunset), enhanced 2025-2026.
 
 ## Support
 
-For issues:
-1. Check the Troubleshooting section above
-2. Verify your PHP error logs
-3. Test with default coordinates first
-4. Ensure your AUTH_TOKEN is properly configured
+Check PHP error logs and verify configuration. The script is self-contained and requires minimal setup when properly configured.
