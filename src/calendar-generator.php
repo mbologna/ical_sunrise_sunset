@@ -204,6 +204,59 @@ while ($current_day <= $end) {
 
     $solar_noon_time = date($time_format, $solar_noon);
 
+    // Build context arrays for supplemental information
+    $dawn_ctx = [
+        'times' => compact(
+            'sunrise',
+            'sunset',
+            'solar_noon',
+            'civil_begin',
+            'civil_end',
+            'nautical_begin',
+            'nautical_end',
+            'astro_begin',
+            'astro_end'
+        ),
+        'format' => $time_format,
+        'enabled' => $enabled,
+        'daylight' => compact(
+            'daylight_seconds',
+            'daylight_pct',
+            'daylight_percentile',
+            'day_length_comparison',
+            'solar_noon_time',
+            'winter_comparison',
+            'summer_comparison',
+            'winter_solstice_info',
+            'summer_solstice_info',
+            'diff_from_winter',
+            'diff_from_summer'
+        ),
+    ];
+
+    $dusk_ctx = [
+        'times' => compact(
+            'sunrise',
+            'sunset',
+            'civil_begin',
+            'civil_end',
+            'nautical_begin',
+            'nautical_end',
+            'astro_begin',
+            'astro_end',
+            'next_astro_begin'
+        ),
+        'format' => $time_format,
+        'enabled' => $enabled,
+        'night' => compact(
+            'night_seconds',
+            'night_pct',
+            'night_percentile',
+            'night_length_comparison',
+            'moon_info'
+        ),
+    ];
+
     // Check for week summary (Sundays)
     $day_of_week = date('w', $current_day);
     if ($day_of_week == 0 && $include_daynight) {
@@ -212,7 +265,6 @@ while ($current_day <= $end) {
         if ($week_data) {
             $week_end_date = date('M j', strtotime('+6 days', $current_day));
             $start_date = date('M j', $current_day);
-            $separator = format_separator();
             $moon_emoji = get_moon_phase_emoji($week_data['moon_phase']);
 
             // Get last year's week data for comparison
@@ -226,15 +278,13 @@ while ($current_day <= $end) {
             echo 'SUMMARY:' . sprintf($STRINGS['week_summary']['title_format'], $start_date, $week_end_date) . "\r\n";
 
             // AT A GLANCE section
-            $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-            $desc .= $separator . "\n";
+            $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
             $desc .= "{$STRINGS['labels']['trend']}: {$week_data['trend_emoji']} {$week_data['trend']}\n";
             $avg_formatted = format_duration_full((int) $week_data['avg_length']);
             $desc .= "{$STRINGS['labels']['average']}: {$avg_formatted}\n\n";
 
             // DETAILS section
-            $desc .= "{$STRINGS['headers']['details']}\n";
-            $desc .= $separator . "\n";
+            $desc .= "{$STRINGS['headers']['details']}\n\n";
             $week_sign = ($week_data['total_change'] >= 0) ? '+' : '';
             $change_formatted = format_duration_short((int) abs($week_data['total_change']));
             $desc .= "{$STRINGS['labels']['change']}: {$week_sign}{$change_formatted}\n";
@@ -244,8 +294,7 @@ while ($current_day <= $end) {
             $desc .= "  " . format_duration_full((int) $week_data['max_length']) . "\n\n";
 
             // COMPARISONS section
-            $desc .= "{$STRINGS['headers']['comparisons']}\n";
-            $desc .= $separator . "\n";
+            $desc .= "{$STRINGS['headers']['comparisons']}\n\n";
             if ($last_year_data) {
                 $diff_from_last_year = $week_data['avg_length'] - $last_year_data['avg_length'];
                 $last_year_sign = ($diff_from_last_year >= 0) ? '+' : '-';
@@ -261,7 +310,6 @@ while ($current_day <= $end) {
             // Add location notes (only first week)
             if (!$notes_shown && !empty($location_notes)) {
                 $desc .= "\n\n{$STRINGS['headers']['location_notes']}\n";
-                $desc .= $separator . "\n";
                 foreach ($location_notes as $note) {
                     $desc .= $note . "\n";
                 }
@@ -302,34 +350,8 @@ while ($current_day <= $end) {
         $start_time = $civil_begin + $rise_offset;
         $end_time = $sunrise + $rise_offset;
         $duration = format_duration_full($sunrise - $civil_begin);
-        $separator = format_separator();
 
-        $supplemental = build_dawn_supplemental(
-            $sunrise,
-            $sunset,
-            $solar_noon,
-            $civil_begin,
-            $civil_end,
-            $nautical_begin,
-            $nautical_end,
-            $astro_begin,
-            $astro_end,
-            $time_format,
-            $enabled,
-            $daylight_seconds,
-            $daylight_pct,
-            $daylight_percentile,
-            $day_length_comparison,
-            $winter_comparison,
-            $summer_comparison,
-            $solar_noon_time,
-            $winter_solstice_info,
-            $summer_solstice_info,
-            $diff_from_winter,
-            $diff_from_summer,
-            'civil',
-            $STRINGS
-        );
+        $supplemental = build_dawn_supplemental($dawn_ctx, $STRINGS);
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:civil-dawn-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -339,19 +361,19 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['civil_dawn']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$duration}\n\n";
 
         // DETAILS section with sunrise/sunset context
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: " . date($time_format, $sunrise) . "\n";
         $desc .= "{$STRINGS['labels']['sunset']}: " . date($time_format, $sunset) . "\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['civil_dawn']}";
         $desc .= $supplemental;
 
@@ -365,34 +387,8 @@ while ($current_day <= $end) {
         $start_time = $nautical_begin + $rise_offset;
         $end_time = $civil_begin + $rise_offset;
         $duration = format_duration_full($civil_begin - $nautical_begin);
-        $separator = format_separator();
 
-        $supplemental = build_dawn_supplemental(
-            $sunrise,
-            $sunset,
-            $solar_noon,
-            $civil_begin,
-            $civil_end,
-            $nautical_begin,
-            $nautical_end,
-            $astro_begin,
-            $astro_end,
-            $time_format,
-            $enabled,
-            $daylight_seconds,
-            $daylight_pct,
-            $daylight_percentile,
-            $day_length_comparison,
-            $winter_comparison,
-            $summer_comparison,
-            $solar_noon_time,
-            $winter_solstice_info,
-            $summer_solstice_info,
-            $diff_from_winter,
-            $diff_from_summer,
-            'nautical',
-            $STRINGS
-        );
+        $supplemental = build_dawn_supplemental($dawn_ctx, $STRINGS);
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:nautical-dawn-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -402,19 +398,19 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['nautical_dawn']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$duration}\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: " . date($time_format, $sunrise) . "\n";
         $desc .= "{$STRINGS['labels']['sunset']}: " . date($time_format, $sunset) . "\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['nautical_dawn']}";
         $desc .= $supplemental;
 
@@ -428,34 +424,8 @@ while ($current_day <= $end) {
         $start_time = $astro_begin + $rise_offset;
         $end_time = $nautical_begin + $rise_offset;
         $duration = format_duration_full($nautical_begin - $astro_begin);
-        $separator = format_separator();
 
-        $supplemental = build_dawn_supplemental(
-            $sunrise,
-            $sunset,
-            $solar_noon,
-            $civil_begin,
-            $civil_end,
-            $nautical_begin,
-            $nautical_end,
-            $astro_begin,
-            $astro_end,
-            $time_format,
-            $enabled,
-            $daylight_seconds,
-            $daylight_pct,
-            $daylight_percentile,
-            $day_length_comparison,
-            $winter_comparison,
-            $summer_comparison,
-            $solar_noon_time,
-            $winter_solstice_info,
-            $summer_solstice_info,
-            $diff_from_winter,
-            $diff_from_summer,
-            'astro',
-            $STRINGS
-        );
+        $supplemental = build_dawn_supplemental($dawn_ctx, $STRINGS);
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:astro-dawn-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -465,19 +435,19 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['astronomical_dawn']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$duration}\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: " . date($time_format, $sunrise) . "\n";
         $desc .= "{$STRINGS['labels']['sunset']}: " . date($time_format, $sunset) . "\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['astronomical_dawn']}";
         $desc .= $supplemental;
 
@@ -493,7 +463,6 @@ while ($current_day <= $end) {
         $daylight_duration = format_duration_full((int) $daylight_seconds);
         $sunrise_time = date($time_format, $sunrise);
         $sunset_time = date($time_format, $sunset);
-        $separator = format_separator();
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:daylight-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -503,22 +472,22 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['daylight']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$daylight_duration}\n";
         $desc .= "{$STRINGS['labels']['progress']}: " . format_percentile_bar($daylight_percentile) . "\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: {$sunrise_time}\n";
         $desc .= "{$STRINGS['labels']['sunset']}: {$sunset_time}\n";
         $desc .= "{$STRINGS['labels']['solar_noon']}: {$solar_noon_time}\n";
         $desc .= "{$STRINGS['labels']['of_day']}: " . number_format($daylight_pct, 1) . "%\n\n";
 
         // COMPARISONS section
-        $desc .= "{$STRINGS['headers']['comparisons']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['comparisons']}\n\n";
+
         if ($day_length_comparison) {
             $desc .= "{$STRINGS['labels']['vs_yesterday']}: {$day_length_comparison}\n";
         }
@@ -530,8 +499,8 @@ while ($current_day <= $end) {
         $desc .= "  ({$summer_solstice_info})\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['daylight']}";
 
         if ($description) {
@@ -548,28 +517,8 @@ while ($current_day <= $end) {
         $start_time = $sunset + $set_offset;
         $end_time = $civil_end + $set_offset;
         $duration = format_duration_full($civil_end - $sunset);
-        $separator = format_separator();
 
-        $supplemental = build_dusk_supplemental(
-            $sunrise,
-            $sunset,
-            $civil_begin,
-            $civil_end,
-            $nautical_begin,
-            $nautical_end,
-            $astro_begin,
-            $astro_end,
-            $next_astro_begin,
-            $time_format,
-            $enabled,
-            $night_seconds,
-            $night_pct,
-            $night_percentile,
-            $night_length_comparison,
-            $moon_info,
-            'civil',
-            $STRINGS
-        );
+        $supplemental = build_dusk_supplemental($dusk_ctx, $STRINGS);
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:civil-dusk-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -579,19 +528,19 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['civil_dusk']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$duration}\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: " . date($time_format, $sunrise) . "\n";
         $desc .= "{$STRINGS['labels']['sunset']}: " . date($time_format, $sunset) . "\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['civil_dusk']}";
         $desc .= $supplemental;
 
@@ -605,28 +554,8 @@ while ($current_day <= $end) {
         $start_time = $civil_end + $set_offset;
         $end_time = $nautical_end + $set_offset;
         $duration = format_duration_full($nautical_end - $civil_end);
-        $separator = format_separator();
 
-        $supplemental = build_dusk_supplemental(
-            $sunrise,
-            $sunset,
-            $civil_begin,
-            $civil_end,
-            $nautical_begin,
-            $nautical_end,
-            $astro_begin,
-            $astro_end,
-            $next_astro_begin,
-            $time_format,
-            $enabled,
-            $night_seconds,
-            $night_pct,
-            $night_percentile,
-            $night_length_comparison,
-            $moon_info,
-            'nautical',
-            $STRINGS
-        );
+        $supplemental = build_dusk_supplemental($dusk_ctx, $STRINGS);
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:nautical-dusk-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -636,19 +565,19 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['nautical_dusk']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$duration}\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: " . date($time_format, $sunrise) . "\n";
         $desc .= "{$STRINGS['labels']['sunset']}: " . date($time_format, $sunset) . "\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['nautical_dusk']}";
         $desc .= $supplemental;
 
@@ -662,28 +591,8 @@ while ($current_day <= $end) {
         $start_time = $nautical_end + $set_offset;
         $end_time = $astro_end + $set_offset;
         $duration = format_duration_full($astro_end - $nautical_end);
-        $separator = format_separator();
 
-        $supplemental = build_dusk_supplemental(
-            $sunrise,
-            $sunset,
-            $civil_begin,
-            $civil_end,
-            $nautical_begin,
-            $nautical_end,
-            $astro_begin,
-            $astro_end,
-            $next_astro_begin,
-            $time_format,
-            $enabled,
-            $night_seconds,
-            $night_pct,
-            $night_percentile,
-            $night_length_comparison,
-            $moon_info,
-            'astro',
-            $STRINGS
-        );
+        $supplemental = build_dusk_supplemental($dusk_ctx, $STRINGS);
 
         echo "BEGIN:VEVENT\r\n";
         echo "UID:astro-dusk-{$date_str}-{$lat}-{$lon}@sun-calendar\r\n";
@@ -693,19 +602,19 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['astronomical_dusk']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$duration}\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['sunrise']}: " . date($time_format, $sunrise) . "\n";
         $desc .= "{$STRINGS['labels']['sunset']}: " . date($time_format, $sunset) . "\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['astronomical_dusk']}";
         $desc .= $supplemental;
 
@@ -719,7 +628,6 @@ while ($current_day <= $end) {
         $start_time = $astro_end + $set_offset;
         $end_time = $next_astro_begin + $rise_offset;
         $night_duration = format_duration_full((int) $night_seconds);
-        $separator = format_separator();
         $moon_emoji = get_moon_phase_emoji($moon_info['phase_name']);
 
         $solar_midnight = $astro_end + (($next_astro_begin - $astro_end) / 2);
@@ -733,27 +641,27 @@ while ($current_day <= $end) {
         echo "SUMMARY:{$STRINGS['summaries']['night']}\r\n";
 
         // AT A GLANCE section
-        $desc = "{$STRINGS['headers']['at_a_glance']}\n";
-        $desc .= $separator . "\n";
+        $desc = "{$STRINGS['headers']['at_a_glance']}\n\n";
+
         $desc .= "{$STRINGS['labels']['duration']}: {$night_duration}\n";
         $desc .= "{$STRINGS['labels']['progress']}: " . format_percentile_bar($night_percentile) . "\n\n";
 
         // DETAILS section
-        $desc .= "{$STRINGS['headers']['details']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['details']}\n\n";
+
         $desc .= "{$STRINGS['labels']['solar_midnight']}: {$solar_midnight_time}\n";
         $desc .= "{$STRINGS['labels']['of_day']}: " . number_format($night_pct, 1) . "%\n\n";
 
         // COMPARISONS section
-        $desc .= "{$STRINGS['headers']['comparisons']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['comparisons']}\n\n";
+
         if ($night_length_comparison) {
             $desc .= "{$STRINGS['labels']['vs_yesterday']}: {$night_length_comparison}\n\n";
         }
 
         // MOON PHASE section with emoji
         $desc .= "{$STRINGS['headers']['moon_phase']}\n";
-        $desc .= $separator . "\n";
+
         $desc .= "{$STRINGS['labels']['current']}: {$moon_emoji} {$moon_info['phase_name']}\n";
         $illum = number_format((float) $moon_info['illumination'], 0);
         $desc .= "{$STRINGS['labels']['illumination']}: {$illum}%\n";
@@ -767,8 +675,8 @@ while ($current_day <= $end) {
         $desc .= "  {$moon_info['next_phase']['date']}\n\n";
 
         // CONTEXT section
-        $desc .= "{$STRINGS['headers']['context']}\n";
-        $desc .= $separator . "\n";
+        $desc .= "{$STRINGS['headers']['context']}\n\n";
+
         $desc .= "{$STRINGS['twilight_descriptions']['night']}";
 
         if ($description) {
