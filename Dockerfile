@@ -1,4 +1,4 @@
-FROM php:8.5-apache@sha256:e55e196fca35436fd26ba36e6fd2f2d9846142d0561dc35f74c7d25db1d54318
+FROM php:8.5-apache@sha256:613544da9bc080551901e6ee7784e6c573bcbc635453b96ce6f14be13d29b03d
 
 # Configure document root: use app entrypoint as directory index, disable directory listing
 RUN printf '<Directory /var/www/html>\n    DirectoryIndex sunrise-sunset-calendar.php\n    Options -Indexes\n</Directory>\n' \
